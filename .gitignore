@@ -1,0 +1,5 @@
+moritzknolle-deepImmune3D-ab0e75a/
+runs/
+.ipynb_checkpoints/
+__pycache__/
+*.pt
