@@ -3,3 +3,5 @@ runs/
 .ipynb_checkpoints/
 __pycache__/
 *.pt
+cellphonedb-data/
+*.json

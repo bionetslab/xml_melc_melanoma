@@ -19,7 +19,9 @@ class Trainer:
                  optim, 
                  train_dl,
                  val_dl,
-                 device="cuda:0"):  
+                 device="cuda:0",
+                 summary_writer_name=None):
+          
         
         self._model = model
         self._crit = crit
@@ -29,7 +31,9 @@ class Trainer:
         self._val_dl = val_dl
         
         self._device = device
-        self._writer = SummaryWriter(f"runs/{datetime.datetime.now()}")
+        if summary_writer_name == None:
+            summary_writer_name = datetime.datetime.now()
+        self._writer = SummaryWriter(f"runs/{summary_writer_name}")
         self._model = self._model.to(device)
         self._crit = self._crit.to(device)
 
@@ -94,12 +98,16 @@ class Trainer:
 
                     features = features.to(self._device)
                     labels = labels.to(self._device)
+
+
                     loss, predictions = self.val_test_step(features, labels)
                     losses.append(loss)
                                         
                     predictions_np = predictions.detach().cpu().numpy()
+                    
                     predictions_np = predictions_np > 0.5
-                    f1_scores.append(f1_score(l, predictions_np.astype(int), average="weighted"))
+
+                    f1_scores.append(f1_score(l, predictions_np.astype(int)))
                     acc.append(accuracy_score(l, predictions_np.astype(int)))
                 except StopIteration:
                     break
@@ -129,12 +137,11 @@ class Trainer:
             f1 = val_loss[1]
             acc = val_loss[2] 
             
-            if f1 > 0.5 and acc > 0.6:
+            if f1 > 0.79 and acc > 0.79:
                 if f1 > maxf1 and acc > maxacc:
                     maxf1 = f1
                     maxacc = acc
-                    #time1 = time.time()
-                    #t.save(self._model, f"/data/chercheurs/moeller221/leukemia/model_{time1}_{e}.pt")
+                    t.save(self._model.state_dict(), f"model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
             
             
             self._writer.add_scalar(f"Train loss", train_loss, e)

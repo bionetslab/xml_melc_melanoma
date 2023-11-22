@@ -8,6 +8,7 @@ from scipy.ndimage import rotate
 import os
 import torch as t
 import matplotlib.pyplot as plt
+import json
 
 
 class AddGaussianNoiseToRandomChannel(object):
@@ -28,31 +29,12 @@ class AddGaussianNoiseToRandomChannel(object):
 class MelanomaData(Dataset):
     def __init__(self, markers, data, mode="train", size=512):
         assert mode in ["train", "val"]
-        self._means = {'Propidium': 0.08709432088084537,
- 'phase': 0.20165798089522852,
- 'CD95': 0.15458872610503402,
- 'CD274': 0.011001287112713207,
- 'Melan-A': 0.20414190063443236,
- 'Bcl-2': 0.19218153937964813,
- 'ADAM10-PE': 0.14058495656368772, 
- 'CD63': 0.08018959974667886,
-  'HLA-DR': 0.10238566351889483,
- 'CD3': 0.07303562418427084,
- 'CD8': 0.06087764743323087,}
+        with open('means.json', 'r') as fp:
+            self._means = json.load(fp)
+        with open('stds.json', 'r') as fp:
+            self._stds = json.load(fp)
 
-        self._stds = {'Propidium': 0.14430829142838894,
- 'phase': 0.17220733942502406,
- 'CD95': 0.17349428432452133,
- 'CD274': 0.07518154696891112,
- 'Melan-A': 0.18290552133520185,
- 'Bcl-2': 0.17599850706607423,
- 'ADAM10-PE': 0.1505377234936453, 
- 'CD63': 0.12011534021218785,
- 'HLA-DR': 0.13826473686677376,
- 'CD3': 0.1299362741733283,
- 'CD8': 0.11157233764201473,}
 
-        
         self._data = data
         self._mode = mode
         self._markers = markers
@@ -80,12 +62,15 @@ class MelanomaData(Dataset):
     
     def _get_channel(self, sample, channel):
         try:
-            file = [m for m in os.listdir(sample) if channel in m and not os.path.isdir(os.path.join(sample, m))][0]
-            img = cv2.imread(os.path.join(sample, file), cv2.IMREAD_GRAYSCALE)
+            try:
+                file = [os.path.join(sample, m) for m in os.listdir(sample) if channel in m and not os.path.isdir(os.path.join(sample, m))][0]
+            except TypeError:
+                file = [os.path.join(sample, m.decode('utf-8')) for m in os.listdir(sample) if channel in m.decode('utf-8') and not os.path.isdir(os.path.join(sample, m.decode('utf-8')))][0]
+                #print(file, "was byte encoded")
+            img = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
             img = img.astype("float64") / 255.
-        except:
-            img = np.full((2018, 2018), self._means[channel])
-            # raise Exception(f"{sample} lacks {channel}")
+        except IndexError:
+                img = np.full((2018, 2018), self._means[channel])
         return img
         
     
@@ -94,10 +79,8 @@ class MelanomaData(Dataset):
         Given sample index, return the augmented patch
         '''
         sample = self._data[index]
-        
-        label = np.array([0., 0.])
-        label[os.path.basename(self._data[index]).startswith("Nevi")] = 1. # Melanoma: [1, 0], Nevi: [0, 1]
-        label = t.from_numpy(label)
+        label = np.array([int(os.path.basename(self._data[index]).startswith("Nevi"))])
+        label = t.from_numpy(label).float()
          
         img_files = list()
         for ch in self._markers:
