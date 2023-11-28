@@ -40,13 +40,18 @@ class EfficientnetWithFinetuning(t.nn.Module):
         # freeze all layers except the first one to keep the pre-trained parameters
         for l in self.features[1:]:
             l.requires_grad = False
+        for l in self.features:
+            self.activation = self.features[0](x).detach()
         x = self.features(x)
         x = self.avgpool(x)
         x = self.flatten(x)
         x = self.classifier1(x)     
         x = self.classifier2(x)    
-        return x 
-    
+        return x
+
+    def get_activation(self,):
+        # Retrieve the stored activation for the specified layer
+        return self.activation
 
 
 if __name__ == "__main__":
