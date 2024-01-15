@@ -29,7 +29,7 @@ class EfficientnetWithFinetuning(t.nn.Module):
 
         # two classifiers to enable (unsupervised) clustering on 50-dim. latent space, could be replaced by one if latent space not required
         latent_features = 50 
-        out_features = 1
+        out_features = 4
         
         self.classifier1 = t.nn.Sequential(t.nn.Dropout(p=0.1, inplace=True), t.nn.Linear(1792, latent_features, bias=True))
         self.classifier2 = t.nn.Sequential(t.nn.Linear(latent_features, out_features, bias=True), t.nn.Sigmoid())

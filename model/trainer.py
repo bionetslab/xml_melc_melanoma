@@ -107,7 +107,7 @@ class Trainer:
                     
                     predictions_np = predictions_np > 0.5
 
-                    f1_scores.append(f1_score(l, predictions_np.astype(int)))
+                    f1_scores.append(f1_score(l, predictions_np.astype(int), average="macro"))
                     acc.append(accuracy_score(l, predictions_np.astype(int)))
                 except StopIteration:
                     break

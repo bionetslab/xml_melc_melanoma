@@ -27,7 +27,7 @@ f = open("config.json")
 config = json.load(f)
 data_path = config[data]
 seg_results_path = config["segmentation_results"]
-os.makedirs(os.path.join(seg_results_path, "anndata_files"), exist_ok=True)
+# TODO os.makedirs(os.path.join(seg_results_path, "anndata_files"), exist_ok=True)
 seg = MELC_Segmentation(data_path, membrane_markers=None) 
 # membrane_marker: str/None 
 # radius: multiple of cell radius
@@ -86,7 +86,7 @@ antibody_gene_symbols = {
     'phospho-Connexin': 'GJA1'
 }
 
-os.makedirs(os.path.join(seg_results_path, "anndata_files"), exist_ok=True)
+# TODO os.makedirs(os.path.join(seg_results_path, "anndata_files"), exist_ok=True)
 
 segment = "cell"
 result_dict = dict()
@@ -97,8 +97,10 @@ if comorbidity_info:
 
 EA = ExpressionAnalyzer(data_path=data_path, segmentation_results_dir_path=seg_results_path, membrane_markers=None, markers_of_interest=list(antibody_gene_symbols.keys()))
 EA.run(segment=segment, profile=None)
+
 expression_data = EA.expression_data.sort_index()
-expression_data = expression_data.fillna(0)
+print(expression_data.shape)
+#expression_data = expression_data.fillna(0)
 #expression_data = expression_data.drop_duplicates()
 
 for i, fov in enumerate(tqdm(seg.fields_of_view)):
@@ -117,8 +119,11 @@ for i, fov in enumerate(tqdm(seg.fields_of_view)):
         nuc = np.load(os.path.join(seg_results_path, f"{fov}_nuclei.npy"))
         cell = np.load(os.path.join(seg_results_path, f"{fov}_cells.npy"))
     else:
-        nuc, cell, where_nuc, where_cell = seg.run()
-
+        try:
+            nuc, cell, where_nuc, where_cell = seg.run()
+        except:
+            print("skipping", fov, " - no segmentation file")
+            continue
     where_dict = where_nuc if segment == "nuclei" else where_cell   
     where_dict = dict(sorted(where_dict.items()))   
             
@@ -128,23 +133,13 @@ for i, fov in enumerate(tqdm(seg.fields_of_view)):
     exp_fov = expression_data.loc[fov].copy()
     exp_fov = exp_fov.drop(["Sample", "Group"], axis=1)
     
-    to_drop = list()
-    new_columns = list()
-    for antibody in exp_fov.columns:
-        col = "-".join(antibody.split("-")[:-1])
-        if not col in list(antibody_gene_symbols.keys()):
-            to_drop.append(antibody)
-        else:
-            new_columns.append(col)
 
-    exp_fov = exp_fov.drop(to_drop, axis=1)
-    exp_fov.columns = new_columns
     adata = ad.AnnData(exp_fov)
-    adata.var = pd.DataFrame(np.array(new_columns), columns=["gene_symbol"])
+    adata.var = pd.DataFrame(np.array(exp_fov.columns), columns=["gene_symbol"])
     
     adata.obsm["cellLabelInImage"] = np.array([int(a) for a in list(exp_fov.index)])
 
-    adata.varm["antibody"] = pd.DataFrame(exp_fov.columns, columns=["antibody"])
+    #adata.varm["antibody"] = pd.DataFrame(exp_fov.columns, columns=["antibody"])
     adata.obsm["cellSize"] = np.array([len(where_dict[k][0]) for k in where_dict])      
     adata.obsm["Group"] = np.array([group] * len(adata.obsm["cellSize"]))
             
@@ -182,6 +177,9 @@ for i, fov in enumerate(tqdm(seg.fields_of_view)):
     adata.uns["spatial"]["segmentation"] = nuc if segment == "nuclei" else cell
 
     result_dict[i] = adata
+
+print(result_dict.keys())
+print(result_dict[0])
 
 with open(os.path.join(seg_results_path, "anndata_files", f"adata_{segment}.pickle"), 'wb') as handle:
     pickle.dump(result_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)

@@ -29,9 +29,9 @@ class AddGaussianNoiseToRandomChannel(object):
 class MelanomaData(Dataset):
     def __init__(self, markers, data, mode="train", size=512):
         assert mode in ["train", "val"]
-        with open('means.json', 'r') as fp:
+        with open('ctcl_means.json', 'r') as fp:
             self._means = json.load(fp)
-        with open('stds.json', 'r') as fp:
+        with open('ctcl_stds.json', 'r') as fp:
             self._stds = json.load(fp)
 
 
@@ -78,10 +78,21 @@ class MelanomaData(Dataset):
         '''
         Given sample index, return the augmented patch
         '''
-        sample = self._data[index]
-        label = np.array([int(os.path.basename(self._data[index]).startswith("Nevi"))])
+        sample = os.path.join("/data_nfs/datasets/melc/ctcl/processed", self._data.iloc[index]["file_path"])
+        group = self._data.iloc[index]["Group"]
+        if group == "Psoriasis": 
+            label = np.array([1, 0, 0, 0])
+        elif group == "Eczema":
+            label = np.array([0, 1, 0, 0])
+        elif group == "T-Cell Lymphoma":
+            label = np.array([0, 0, 1, 0])
+        elif group == "B-Cell Lymphoma":
+            label = np.array([0, 0, 0, 1])
+        else:
+            print("unknown group")
+        
         label = t.from_numpy(label).float()
-         
+
         img_files = list()
         for ch in self._markers:
             img_files.append(self._get_channel(sample, ch))
@@ -95,4 +106,5 @@ class MelanomaData(Dataset):
 
         tens = tens.float()
         return tens, label
+        
 
