@@ -16,14 +16,15 @@ def main():
     dataset = "CTCL"
     data = data[data["Dataset"] == dataset]
     data = data[~data["file_path"].isna()]
-        
-    splits = {"train": 0.7, "val": 0.2, "test": 0.1}
+    data = data[data["Group"].isin(["Eczema", "T-Cell Lymphoma"])]
+    
+    splits = {"train": 0.8, "val": 0.2} #, "test": 0.1}
     data["split"] = np.random.choice(list(splits.keys()), len(data), p=list(splits.values()))
 
     markers = ['ADAM10', 'CD10', 'CD11a', 'CD11c', 'CD14', 'CD16', 'CD163', 'CD2', 'CD24', 'CD25', 'CD29', 'CD3', 'CD36', 'CD38', 'CD4', 'CD40', 'CD44', 'CD45', 'CD45RA', 'CD45RO', 'CD5', 'CD54', 'CD55', 'CD56', 'CD6', 'CD62P', 'CD63', 'CD68', 'CD69', 'CD7', 'CD8', 'CD9', 'CD95', 'Cytokeratin-14', 'HLA-ABC', 'HLA-DR', 'Notch-1', 'Notch-3', 'TNFR1', 'Vimentin']
     
-    vdl = t.utils.data.DataLoader(MelanomaData(markers, data[data["split"] == "train"], mode="train"), batch_size=20, shuffle=True)
-    tdl = t.utils.data.DataLoader(MelanomaData(markers, data[data["split"] == "val"], mode="val"), batch_size=20, shuffle=True)
+    vdl = t.utils.data.DataLoader(MelanomaData(markers, dataset, data[data["split"] == "train"], mode="train"), batch_size=20, shuffle=True)
+    tdl = t.utils.data.DataLoader(MelanomaData(markers, dataset, data[data["split"] == "val"], mode="val"), batch_size=20, shuffle=True)
 
     print("loaded data")
     
@@ -32,7 +33,7 @@ def main():
     #crit = t.nn.CrossEntropyLoss()
     #crit = t.nn.BCEWithLogitsLoss()
     crit = t.nn.BCELoss()
-    optim = t.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    optim = t.optim.Adam(model.parameters(), lr=5e-5, weight_decay=1e-5)
 
     summary_writer_name = "ctcl_all_with_weight_decay_lr=1e-4" # TODO
 
@@ -45,7 +46,7 @@ def main():
                     summary_writer_name=summary_writer_name)
     print("evoked trainer")
     
-    res = trainer.fit(epochs=200)
+    res = trainer.fit(epochs=150)
     print(res)
     model.eval()
     print('done')

@@ -27,14 +27,16 @@ class AddGaussianNoiseToRandomChannel(object):
         
 
 class MelanomaData(Dataset):
-    def __init__(self, markers, data, mode="train", size=512):
+    def __init__(self, markers, dataset, data, mode="train", size=512):
         assert mode in ["train", "val"]
-        with open('ctcl_means.json', 'r') as fp:
+        
+        
+        with open(f'/data_nfs/je30bery/melanoma_data/model/{dataset.lower()}_means.json', 'r') as fp:
             self._means = json.load(fp)
-        with open('ctcl_stds.json', 'r') as fp:
+        with open(f'/data_nfs/je30bery/melanoma_data/model/{dataset.lower()}_stds.json', 'r') as fp:
             self._stds = json.load(fp)
-
-
+        
+        self._dataset = dataset
         self._data = data
         self._mode = mode
         self._markers = markers
@@ -78,19 +80,35 @@ class MelanomaData(Dataset):
         '''
         Given sample index, return the augmented patch
         '''
-        sample = os.path.join("/data_nfs/datasets/melc/ctcl/processed", self._data.iloc[index]["file_path"])
-        group = self._data.iloc[index]["Group"]
-        if group == "Psoriasis": 
-            label = np.array([1, 0, 0, 0])
-        elif group == "Eczema":
-            label = np.array([0, 1, 0, 0])
-        elif group == "T-Cell Lymphoma":
-            label = np.array([0, 0, 1, 0])
-        elif group == "B-Cell Lymphoma":
-            label = np.array([0, 0, 0, 1])
-        else:
-            print("unknown group")
+        sample = os.path.join(f"/data_nfs/datasets/melc/{self._dataset.lower()}/processed", self._data.iloc[index]["file_path"])
         
+        group = self._data.iloc[index]["Group"]
+
+        
+        if self._dataset == "Melanoma":
+            if group == "Melanoma":
+                label = np.array([1])
+            elif group == "Nevus":
+                label = np.array([0])
+            else:
+                print("unknown group")
+        
+        elif self._dataset == "CTCL":
+            if group == "Eczema":
+                label = np.array([0])
+            elif group == "T-Cell Lymphoma":
+                label = np.array([1])
+            
+    
+        #if group == "Psoriasis": 
+        #    label = np.array([1, 0, 0, 0])
+        #elif group == "Eczema":
+        #    label = np.array([0, 1, 0, 0])
+        #elif group == "T-Cell Lymphoma":
+        #    label = np.array([0, 0, 1, 0])
+        #elif group == "B-Cell Lymphoma":
+        #    label = np.array([0, 0, 0, 1])
+       
         label = t.from_numpy(label).float()
 
         img_files = list()
