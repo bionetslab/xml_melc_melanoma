@@ -103,16 +103,16 @@ class Trainer:
                     loss, predictions = self.val_test_step(features, labels)
                     losses.append(loss)
                                         
-                    predictions_np = predictions.detach().cpu().numpy()
+                    #predictions_np = predictions.detach().cpu().numpy()
                     
-                    predictions_np = predictions_np > 0.5
+                    #predictions_np = predictions_np > 0.5
 
-                    f1_scores.append(f1_score(l, predictions_np.astype(int), average="macro"))
-                    acc.append(accuracy_score(l, predictions_np.astype(int)))
+                    #f1_scores.append(f1_score(l, predictions_np.astype(int), average="macro"))
+                    #acc.append(accuracy_score(l, predictions_np.astype(int)))
                 except StopIteration:
                     break
         losses = t.tensor(losses)
-        return t.mean(losses).numpy(), np.mean(f1_scores), np.mean(acc)
+        return t.mean(losses).numpy(), #np.mean(f1_scores), np.mean(acc)
 
     
     def train(self, epochs=50):
@@ -122,9 +122,10 @@ class Trainer:
         val_losses = []
         
         e = 0
+        min_val_loss = 1000
 
-        maxacc = 0
-        maxf1 = 0
+        #maxacc = 0
+        #maxf1 = 0
         while True:
             if e == epochs:
                 print("breaking")
@@ -132,22 +133,28 @@ class Trainer:
             
 
             train_loss = self.train_epoch()
-            val_loss = self.val_test()
-            
-            f1 = val_loss[1]
-            acc = val_loss[2] 
-            
-            if f1 > 0.79 and acc > 0.79:
-                if f1 > maxf1 and acc > maxacc:
-                    maxf1 = f1
-                    maxacc = acc
-                    t.save(self._model.state_dict(), f"model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
+            val_loss = self.val_test()[0]
+            print(val_loss)
+            #f1 = val_loss[1]
+            #acc = val_loss[2] 
+            min_val_loss = np.min([val_loss, min_val_loss])
+            if e > 30:
+                if val_loss == min_val_loss and val_loss < 0.12:
+                    t.save(self._model.state_dict(), f"model_{datetime.datetime.now()}_val_mse={val_loss}_{e}.pt")
+
+                
+                
+            #if f1 > 0.79 and acc > 0.79:
+            #    if f1 > maxf1 and acc > maxacc:
+            #        maxf1 = f1
+            #        maxacc = acc
+            #        t.save(self._model.state_dict(), f"model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
             
             
             self._writer.add_scalar(f"Train loss", train_loss, e)
-            self._writer.add_scalar(f"Val loss", val_loss[0], e)
-            self._writer.add_scalar(f"Val F1-score", f1, e)
-            self._writer.add_scalar(f"Val Accuracy", acc, e)
+            self._writer.add_scalar(f"Val loss", val_loss, e)
+            #self._writer.add_scalar(f"Val F1-score", f1, e)
+            #self._writer.add_scalar(f"Val Accuracy", acc, e)
             self._writer.flush()
             
             """
@@ -167,8 +174,7 @@ class Trainer:
                         pass
                     print(f"Stopping early: {val_losses}")
                     break
-            """    
-            
+            """
             train_losses.append(train_loss)
             val_losses.append(val_loss)
             e += 1

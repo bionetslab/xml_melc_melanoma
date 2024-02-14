@@ -14,9 +14,14 @@ WeightsEnum.get_state_dict = get_state_dict
 
 
 class EfficientnetWithFinetuning(t.nn.Module):
-    def __init__(self, indim):        
+    def __init__(self, indim, cam=False):        
         super(EfficientnetWithFinetuning, self).__init__()
-        
+
+        self.cam = cam
+        if self.cam:
+            self.in_activation = dict()
+            self.out_activation = dict()
+
         # re-use layers of efficientnet_b4 (good ratio of #parameters and performance on ImageNet)
         eff = efficientnet_b4(weights=EfficientNet_B4_Weights.IMAGENET1K_V1) 
         self.features = eff.features
@@ -32,16 +37,24 @@ class EfficientnetWithFinetuning(t.nn.Module):
         out_features = 1
         
         self.classifier1 = t.nn.Sequential(t.nn.Dropout(p=0.1, inplace=True), t.nn.Linear(1792, latent_features, bias=True))
-        self.classifier2 = t.nn.Sequential(t.nn.Linear(latent_features, out_features, bias=True), t.nn.Sigmoid())
+        #self.classifier2 = t.nn.Sequential(t.nn.Linear(latent_features, out_features, bias=True), t.nn.Sigmoid())
+        # for regression (no Sigmoid Layer):
+        self.classifier2 = t.nn.Linear(latent_features, out_features, bias=True)
+
         self.flatten = t.nn.Flatten()
 
 
     def forward(self, x):
         # freeze all layers except the first one to keep the pre-trained parameters
-        for l in self.features[1:]:
-            l.requires_grad = False
-        for l in self.features:
-            self.activation = self.features[0](x).detach()
+        x_copy = x.clone()
+        #for l in self.features[1:]:
+        #    l.requires_grad = False
+        if self.cam:
+            for l in self.features:
+                self.in_activation[l] = x_copy
+                x_copy = l(x_copy)
+                self.out_activation[l] = x_copy
+                
         x = self.features(x)
         x = self.avgpool(x)
         x = self.flatten(x)
@@ -49,9 +62,13 @@ class EfficientnetWithFinetuning(t.nn.Module):
         x = self.classifier2(x)    
         return x
 
-    def get_activation(self,):
+    def get_activation(self, l, mode):
         # Retrieve the stored activation for the specified layer
-        return self.activation
+        assert mode in ["in", "out"], "Do you want the input or output activations?"
+        if mode == "in":
+            return self.in_activation[l]
+        return self.out_activation[l]
+
 
 
 if __name__ == "__main__":

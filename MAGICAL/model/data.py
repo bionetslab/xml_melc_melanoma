@@ -30,10 +30,9 @@ class MelanomaData(Dataset):
     def __init__(self, markers, dataset, data, mode="train", size=512):
         assert mode in ["train", "val"]
         
-        
-        with open(f'/data_nfs/je30bery/melanoma_data/model/{dataset.lower()}_means.json', 'r') as fp:
+        with open(f'/data_nfs/je30bery/melanoma_data/MAGICAL/data/dataset_statistics/{dataset.lower()}_means.json', 'r') as fp:
             self._means = json.load(fp)
-        with open(f'/data_nfs/je30bery/melanoma_data/model/{dataset.lower()}_stds.json', 'r') as fp:
+        with open(f'/data_nfs/je30bery/melanoma_data/MAGICAL/data/dataset_statistics/{dataset.lower()}_stds.json', 'r') as fp:
             self._stds = json.load(fp)
         
         self._dataset = dataset
@@ -82,22 +81,25 @@ class MelanomaData(Dataset):
         '''
         sample = os.path.join(f"/data_nfs/datasets/melc/{self._dataset.lower()}/processed", self._data.iloc[index]["file_path"])
         
-        group = self._data.iloc[index]["Group"]
+        # group = self._data.iloc[index]["Group"]
 
         
         if self._dataset == "Melanoma":
-            if group == "Melanoma":
-                label = np.array([1])
-            elif group == "Nevus":
-                label = np.array([0])
-            else:
-                print("unknown group")
+            label = np.array(self._data.iloc[index][["Float tumor stage"]].astype(float))
+            #print(self._data.iloc[index]["file_path"], label)
         
-        elif self._dataset == "CTCL":
-            if group == "Eczema":
-                label = np.array([0])
-            elif group == "T-Cell Lymphoma":
-                label = np.array([1])
+            #if group == "Melanoma":
+            #    label = np.array([1])
+            #elif group == "Nevus":
+            #    label = np.array([0])
+            #else:
+            #    print("unknown group")
+        
+        #elif self._dataset == "CTCL":
+        #    if group == "Eczema":
+        #        label = np.array([0])
+        #    elif group == "T-Cell Lymphoma":
+        #        label = np.array([1])
             
     
         #if group == "Psoriasis": 

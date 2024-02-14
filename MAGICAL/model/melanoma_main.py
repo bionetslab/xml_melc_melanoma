@@ -28,6 +28,10 @@ def main():
     data = data[~data["file_path"].isna()]
     data = data[data["Group"] == "Melanoma"]
     data = data.dropna(subset=["Tumor stage"], axis=0)
+
+    splits = {"train": 0.8, "val": 0.2} #, "test": 0.1}
+    data["split"] = np.random.choice(list(splits.keys()), len(data), p=list(splits.values()))
+    
     float_ts = {'T1a':1/8,
     'T1b':2/8,
     'T2a':3/8,
@@ -39,10 +43,6 @@ def main():
     'T4b N1b':8/8}
     
     data["Float tumor stage"] = data["Tumor stage"].apply(lambda x: float_ts[x])
-
-    splits = {"train": 0.8, "val": 0.2} #, "test": 0.1}
-    data["split"] = np.random.choice(list(splits.keys()), len(data), p=list(splits.values()))
-    
             
     with open(f'/data_nfs/je30bery/melanoma_data/model/{dataset.lower()}_means.json', 'r') as fp:
         means = json.load(fp)
