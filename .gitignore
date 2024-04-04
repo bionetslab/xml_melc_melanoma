@@ -1,7 +1,0 @@
-runs/
-*.ipynb_checkpoints/*
-*__pycache__/*
-*.pt
-*.json
-MAGICAL/data/
-MAGICAL/THEORETIC/
