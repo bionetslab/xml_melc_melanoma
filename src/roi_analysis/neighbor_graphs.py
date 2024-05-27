@@ -7,7 +7,7 @@ from scipy.stats import norm
 import pickle
 
 class NeighborEnricher:
-    def __init__(self, cell_coordinates, base_path) -> None:
+    def __init__(self, cell_coordinates, config) -> None:
         """
         Initialize the NeighborEnricher object.
 
@@ -18,7 +18,7 @@ class NeighborEnricher:
         self.roi_imgs = dict()
         self.rni_imgs = dict()
         self.cell_coordinates = cell_coordinates
-        self.base_path = base_path
+        self.config = config
         self.count_dfs = dict()
 
     
@@ -62,7 +62,7 @@ class NeighborEnricher:
         Returns:
         - roi_segments (object): ROIs for the specified FOV.
         """
-        roi_path = os.path.join(self.base_path, f"je30bery/melanoma_data/data/ROIs/{model}")
+        roi_path = os.path.join(self.config["ROIs"], model)
         with open(os.path.join(roi_path, fov + "_idxs.pkl"), "rb") as fp:   
             roi_segments = pickle.load(fp)
         return roi_segments
@@ -78,8 +78,8 @@ class NeighborEnricher:
         Returns:
         - cell_types (object): Cell types for the specified FOV.
         """
-        roi_path = os.path.join(self.base_path, "je30bery/melanoma_data/data/cell_types/")
-        with open(os.path.join(roi_path, fov + "_cell_types.pkl"), "rb") as fp:   
+        path = self.config["cell_types"]
+        with open(os.path.join(path, fov + "_cell_types.pkl"), "rb") as fp:   
             cell_types = pickle.load(fp)
         return cell_types
 

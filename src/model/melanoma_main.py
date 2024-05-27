@@ -2,15 +2,15 @@ import numpy as np
 import pandas as pd
 import torch as t
 import multiprocessing as mp
-from trainer import Trainer
 from sklearn.utils import shuffle
 import os
 import json
-from data_utils import get_data_csv
 import datetime
 from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau, StepLR
-from data import MelanomaData
-from model import EfficientnetWithFinetuning, ResNetWithFinetuning, VGGWithFinetuning, EfficientnetWithFinetuningWithVGGClassifier
+
+import sys
+sys.path.append("../..")
+from src import *
 
 t.manual_seed(0)
 
@@ -30,7 +30,6 @@ def balance(pat_data, split_by="split", variable="Label"):
     for split in np.unique(pat_data[split_by]):
         split_data = pat_data[pat_data[split_by] == split]
         v, c = np.unique(split_data[variable], return_counts=True)
-        
         if len(v) != len(values):
             raise ValueError("Split rejected, a split group does not contain samples of all variables")
         max_count = np.max(c)
@@ -75,25 +74,39 @@ def get_data(data, splits = {"train": 0.8, "val": 0.2}, balance_by="Group"):
             continue
     return data
 
-def main(classifier = True):    
+def main():    
     """
     Main function for training the classifier.
 
     Parameters:
     - classifier (bool): set to True for 1st experiment (Melanoma vs. Nevi) and to False for 2nd experiment (coarse tumor stage prediction)
     """
-    classifier = False
-    weight_decay = 1e-7
-    lr = 9e-5
-    batch_size = 32
-    num_epochs = 50
+    
+    idx = int(sys.argv[1])
+    val_samples = list(sys.argv[2:])
+    
+    print(idx, val_samples)
+    
+    with open("/data_nfs/je30bery/melanoma_data/config.json", "r") as f:
+        configs = json.load(f)
+        dataset_statistics = configs["dataset_statistics"]
+
+    classifier = True
+    weight_decay = 1e-6
+    lr = 5e-4
+    batch_size = 50
+    num_epochs = 1
     device = "cuda:0"
     
-    summary_writer_name = f"classifier_only_lr={lr}_weight_decay={weight_decay}_epochs={num_epochs}_dropout_50"
+    summary_writer_name = f"model_{str(idx)}"
 
     if classifier:
         data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False)
-        data = get_data(data, splits = {"train": 0.8, "val": 0.2}, balance_by="Group")
+        data = data.set_index("Histo-ID")
+        data["split"] = "train"
+        data.loc[val_samples, "split"] = "val"
+        data = balance(data, variable="Group")
+        #data = get_data(data, splits = {"train": 0.8, "val": 0.2}, balance_by="Group")
         data.to_csv("split.csv")
     else:
         data = pd.read_csv("split.csv")
@@ -102,7 +115,7 @@ def main(classifier = True):
         data["Coarse tumor stage"] = data["Float tumor stage"] > 0.5
         data = balance(data, split_by="split", variable="Coarse tumor stage")        
 
-    with open(f'../data/dataset_statistics/melanoma_means.json', 'r') as fp:
+    with open(os.path.join(dataset_statistics, f'melanoma_means.json'), 'r') as fp:
         means = json.load(fp)
     markers = list(means.keys())
 
@@ -132,7 +145,7 @@ def main(classifier = True):
     
     trainer.fit(epochs=num_epochs)
     model.eval()
-    t.save(model.state_dict(), f"../model/effnet_tumor_stage_{datetime.datetime.now()}.pt")
+    t.save(model.state_dict(), f"../model/{idx}_{datetime.datetime.now()}.pt")
     print('done')
 
 if __name__ == "__main__":

@@ -154,11 +154,19 @@ class Trainer:
                     losses.append(loss)
                                         
                     predictions_np = predictions.detach().cpu().numpy()
-                    
                     predictions_np = predictions_np > 0.5
-
-                    f1_scores.append(f1_score(l, predictions_np.astype(int), average="macro"))
+                    
+                    #if np.sum(l[pos_labels]) > 0 and np.sum(np.invert(l.astype(bool))[neg_labels]) > 0:
+                    #    pos_labels = np.where(l == 1)
+                    #    pos_acc = np.sum(predictions_np[pos_labels]) / np.sum(l[pos_labels])
+                    #    neg_labels = np.where(l == 0)
+                    #    neg_acc = np.sum(np.invert(predictions_np.astype(bool))[neg_labels]) / np.sum(np.invert(l.astype(bool))[neg_labels])
+                    #    acc.append(np.mean([pos_acc, neg_acc]))
+                        
+                    #else:
                     acc.append(accuracy_score(l, predictions_np.astype(int)))
+                    f1_scores.append(f1_score(l, predictions_np.astype(int), average="weighted"))
+                    
                 except StopIteration:
                     break
         losses = t.tensor(losses)
