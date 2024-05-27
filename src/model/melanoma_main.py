@@ -122,7 +122,7 @@ def main():
     vdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "train"], mode="train"), batch_size=batch_size, shuffle=True)
     tdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "val"], mode="val"), batch_size=batch_size, shuffle=True)
     
-    model = EfficientnetWithFinetuningWithVGGClassifier(indim=len(markers))
+    model = EfficientnetWithFinetuning(indim=len(markers))
     #model.load_state_dict(t.load("/data_nfs/je30bery/melanoma_data/model/finetuned_effnet_with_LR_reduction_on_plateau.pt"), strict=False)
 
     crit = t.nn.BCELoss()
