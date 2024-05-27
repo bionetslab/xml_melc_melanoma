@@ -1,0 +1,8 @@
+runs/
+*.ipynb_checkpoints/*
+*__pycache__/*
+*.pt
+*.json
+data/
+THEORETIC/
+notebooks/clinical_data/
