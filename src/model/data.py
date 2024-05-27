@@ -73,6 +73,7 @@ class MelanomaData(Dataset):
         with open(os.path.join(self._config["dataset_statistics"], 'melanoma_stds.json'), 'r') as fp:
             self._stds = json.load(fp)
         
+        self._size = size
         self._data = data
         self._mode = mode
         self._markers = markers
@@ -117,7 +118,7 @@ class MelanomaData(Dataset):
             img = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
             img = img.astype("float64") / 255.
         except IndexError:
-                img = np.full((2018, 2018), self._means[channel])
+                img = np.full((self._size, self._size), self._means[channel])
         return img
         
     

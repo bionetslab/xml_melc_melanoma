@@ -87,27 +87,27 @@ def main():
     
     print(idx, val_samples)
     
-    with open("/data_nfs/je30bery/melanoma_data/config.json", "r") as f:
+    config_path = "../../config.json"
+    with open(config_path, "r") as f:
         configs = json.load(f)
         dataset_statistics = configs["dataset_statistics"]
 
     classifier = True
     weight_decay = 1e-6
-    lr = 5e-4
-    batch_size = 50
-    num_epochs = 1
+    lr = 1e-6
+    batch_size = 20
+    num_epochs = 30
     device = "cuda:0"
     
     summary_writer_name = f"model_{str(idx)}"
 
     if classifier:
-        data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False)
+        data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False, config_path=config_path)
         data = data.set_index("Histo-ID")
         data["split"] = "train"
         data.loc[val_samples, "split"] = "val"
         data = balance(data, variable="Group")
-        #data = get_data(data, splits = {"train": 0.8, "val": 0.2}, balance_by="Group")
-        data.to_csv("split.csv")
+        data.to_csv(f"split_{idx}.csv")
     else:
         data = pd.read_csv("split.csv")
         #data = get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=False)
@@ -119,14 +119,15 @@ def main():
         means = json.load(fp)
     markers = list(means.keys())
 
-    vdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "train"], mode="train"), batch_size=batch_size, shuffle=True)
-    tdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "val"], mode="val"), batch_size=batch_size, shuffle=True)
+    print(len(data))
+    vdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "train"], mode="train", config_path=config_path), batch_size=batch_size, shuffle=True)
+    tdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "val"], mode="val", config_path=config_path), batch_size=batch_size, shuffle=True)
     
     model = EfficientnetWithFinetuning(indim=len(markers))
     #model.load_state_dict(t.load("/data_nfs/je30bery/melanoma_data/model/finetuned_effnet_with_LR_reduction_on_plateau.pt"), strict=False)
 
     crit = t.nn.BCELoss()
-    optim = t.optim.Adam(model.vggclassifier.parameters(), lr=lr, weight_decay=weight_decay)
+    optim = t.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     scheduler = ReduceLROnPlateau(optim, patience=5)
     #scheduler = CosineAnnealingLR(optim, T_max=num_epochs, eta_min=1e-7)
