@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 import torch as t
-import multiprocessing as mp
-from sklearn.utils import shuffle
 import os
 import json
 import datetime
@@ -91,6 +89,7 @@ def main():
     with open(config_path, "r") as f:
         configs = json.load(f)
         dataset_statistics = configs["dataset_statistics"]
+        checkpoint_path = configs["model_weights"]
 
     classifier = True
     weight_decay = 0
@@ -123,7 +122,9 @@ def main():
     vdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "train"], mode="train", config_path=config_path), batch_size=batch_size, shuffle=True)
     tdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "val"], mode="val", config_path=config_path), batch_size=batch_size, shuffle=True)
     
-    model = EfficientnetWithFinetuning(indim=len(markers))
+    checkpoint_path
+    model = ResNet18_pretrained(indim=len(markers), cam=False, checkpoint_path=checkpoint_path)
+    #model = EfficientnetWithFinetuning(indim=len(markers))
     #model.load_state_dict(t.load("/data_nfs/je30bery/melanoma_data/model/finetuned_effnet_with_LR_reduction_on_plateau.pt"), strict=False)
 
     crit = t.nn.BCELoss()
