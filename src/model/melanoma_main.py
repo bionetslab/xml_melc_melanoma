@@ -93,10 +93,10 @@ def main():
         dataset_statistics = configs["dataset_statistics"]
 
     classifier = True
-    weight_decay = 1e-6
-    lr = 1e-6
-    batch_size = 20
-    num_epochs = 30
+    weight_decay = 0
+    lr = 5e-4
+    batch_size = 50
+    num_epochs = 50
     device = "cuda:0"
     
     summary_writer_name = f"model_{str(idx)}"
