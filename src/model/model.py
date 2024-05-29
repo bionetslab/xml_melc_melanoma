@@ -23,7 +23,7 @@ class ResNet18_pretrained(t.nn.Module):
         # re-use layers of efficientnet_b4 (good ratio of #parameters and performance on ImageNet)
         self.res = resnet18(weights=None)
         #print(res)
-        checkpoint = t.load(checkpoint_path, map_location=t.device('cpu'))
+        checkpoint = t.load(checkpoint_path)
         new_state_dict = {}
         for key, value in checkpoint['state_dict'].items():
             new_key = key.replace("model.resnet.", "")
@@ -40,7 +40,7 @@ class ResNet18_pretrained(t.nn.Module):
         self.res.fc = t.nn.Sequential(t.nn.Dropout(p=0.1, inplace=True), t.nn.Linear(512, 1, bias=True), t.nn.Sigmoid())
         
         # Xavier initialization
-        for layer in self.classifier:
+        for layer in self.res.fc:
             if isinstance(layer, t.nn.Linear):
                 t.nn.init.xavier_uniform_(layer.weight)
                 t.nn.init.constant_(layer.bias, 0.1) 
