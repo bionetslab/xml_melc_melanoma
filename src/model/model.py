@@ -89,7 +89,7 @@ class EfficientnetWithFinetuning(t.nn.Module):
         # binary classifier
         self.avgpool = eff.avgpool
         self.flatten = t.nn.Flatten()
-        self.classifier = t.nn.Sequential(t.nn.Dropout(p=0.1, inplace=True), t.nn.Linear(1792, 1, bias=True), t.nn.Sigmoid())
+        self.classifier = t.nn.Sequential(t.nn.Dropout(p=0.2, inplace=True), t.nn.Linear(1792, 1, bias=True), t.nn.Sigmoid())
         
         # Xavier initialization
         for layer in self.classifier:
