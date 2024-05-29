@@ -118,7 +118,7 @@ class MelanomaData(Dataset):
             img = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
             img = img.astype("float64") / 255.
         except IndexError:
-                img = np.full((self._size, self._size), self._means[channel])
+                img = np.full((2018, 2018), self._means[channel])
         return img
         
     

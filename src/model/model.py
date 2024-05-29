@@ -9,6 +9,7 @@ def get_state_dict(self, *args, **kwargs):
     kwargs.pop("check_hash")
     return load_state_dict_from_url(self.url, *args, **kwargs)
 
+#https://github.com/ozanciga/self-supervised-histopathology/releases/tag/tenpercent
 
 class ResNet18_pretrained(t.nn.Module):    
     def __init__(self, indim, cam=False, checkpoint_path="/data/bionets/je30bery/melanoma_data/pre_trained_weights/tenpercent_resnet18.ckpt"):        

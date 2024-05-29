@@ -94,12 +94,12 @@ def main():
 
     classifier = True
     weight_decay = 1e-6
-    lr = 1e-6
+    lr = 1e-4
     batch_size = 20
     num_epochs = 30
     device = "cuda:0"
     
-    summary_writer_name = f"model_{str(idx)}"
+    summary_writer_name = f"cell_pretrained_model_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
 
     if classifier:
         data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False, config_path=config_path)
