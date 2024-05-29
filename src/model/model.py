@@ -23,7 +23,7 @@ class ResNet18_pretrained(t.nn.Module):
         # re-use layers of efficientnet_b4 (good ratio of #parameters and performance on ImageNet)
         self.res = resnet18(weights=None)
         #print(res)
-        checkpoint = t.load(checkpoint_path, map_location=t.device('cpu'))
+        checkpoint = t.load(checkpoint_path)
         new_state_dict = {}
         for key, value in checkpoint['state_dict'].items():
             new_key = key.replace("model.resnet.", "")
