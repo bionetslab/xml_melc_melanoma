@@ -40,7 +40,7 @@ class ResNet18_pretrained(t.nn.Module):
         self.res.fc = t.nn.Sequential(t.nn.Dropout(p=0.1, inplace=True), t.nn.Linear(512, 1, bias=True), t.nn.Sigmoid())
         
         # Xavier initialization
-        for layer in self.classifier:
+        for layer in self.res.fc:
             if isinstance(layer, t.nn.Linear):
                 t.nn.init.xavier_uniform_(layer.weight)
                 t.nn.init.constant_(layer.bias, 0.1) 

@@ -93,9 +93,9 @@ def main():
 
     classifier = True
     weight_decay = 1e-6
-    lr = 1e-4
+    lr = 5e-4
     batch_size = 20
-    num_epochs = 30
+    num_epochs = 50
     device = "cuda:0"
     
     summary_writer_name = f"cell_pretrained_model_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
@@ -130,7 +130,7 @@ def main():
     crit = t.nn.BCELoss()
     optim = t.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    scheduler = ReduceLROnPlateau(optim, patience=5)
+    scheduler = ReduceLROnPlateau(optim, patience=10)
     #scheduler = CosineAnnealingLR(optim, T_max=num_epochs, eta_min=1e-7)
     #scheduler = StepLR(optim, 5, gamma=0.5)
 
