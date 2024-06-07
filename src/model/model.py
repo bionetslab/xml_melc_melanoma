@@ -11,6 +11,70 @@ def get_state_dict(self, *args, **kwargs):
 
 #https://github.com/ozanciga/self-supervised-histopathology/releases/tag/tenpercent
 
+
+class ResNet18_pretrained_for_finetuning(t.nn.Module):    
+    def __init__(self, indim, cam=False, checkpoint_path="/data/bionets/je30bery/melanoma_data/pre_trained_weights/tenpercent_resnet18.ckpt"):        
+        super(ResNet18_pretrained_for_finetuning, self).__init__()
+
+        self.cam = cam
+        if self.cam:
+            self.in_activation = dict()
+            self.out_activation = dict()
+
+        # re-use layers of efficientnet_b4 (good ratio of #parameters and performance on ImageNet)
+        self.res = resnet18(weights=None)
+        #print(res)
+        checkpoint = t.load(checkpoint_path, map_location="cpu")
+        new_state_dict = {}
+        for key, value in checkpoint['state_dict'].items():
+            new_key = key.replace("model.resnet.", "")
+            new_state_dict[new_key] = value
+
+        # Load the modified state_dict into the model
+        self.res.load_state_dict(new_state_dict, strict=False)
+
+        if indim != 3:
+            self.res.conv1 = t.nn.Conv2d(indim, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+
+        # binary classifier
+        
+        self.res.fc = t.nn.Sequential(t.nn.Linear(in_features=512, out_features=512, bias=True),
+                                      t.nn.ReLU(inplace=False),
+                                      t.nn.Dropout(p=0.2, inplace=False),
+                                      t.nn.Linear(in_features=512, out_features=512, bias=True),
+                                      t.nn.ReLU(inplace=False),
+                                      t.nn.Dropout(p=0.2, inplace=False),
+                                      t.nn.Linear(in_features=512, out_features=1, bias=True),
+                                      t.nn.Sigmoid())
+        
+        # Xavier initialization
+        for layer in self.res.fc:
+            if isinstance(layer, t.nn.Linear):
+                t.nn.init.xavier_uniform_(layer.weight)
+                t.nn.init.constant_(layer.bias, 0.1) 
+                
+
+    def forward(self, x, epoch=-1):
+        for p in self.res.conv1.parameters(): 
+            p.requires_grad = False
+        for p in self.res.bn1.parameters(): 
+            p.requires_grad = False
+        for p in self.res.layer1.parameters(): 
+            p.requires_grad = False
+        for p in self.res.layer2.parameters(): 
+            p.requires_grad = False
+        for p in self.res.layer3.parameters(): 
+            p.requires_grad = False
+        for p in self.res.layer4.parameters(): 
+            p.requires_grad = False
+        x = self.res(x)      
+        return x
+
+
+
+
+
+
 class ResNet18_pretrained(t.nn.Module):    
     def __init__(self, indim, cam=False, checkpoint_path="/data/bionets/je30bery/melanoma_data/pre_trained_weights/tenpercent_resnet18.ckpt"):        
         super(ResNet18_pretrained, self).__init__()
@@ -46,16 +110,19 @@ class ResNet18_pretrained(t.nn.Module):
                 t.nn.init.constant_(layer.bias, 0.1) 
                 
 
-    def forward(self, x):
-        for p in self.res.layer1.parameters(): 
-            p.requires_grad = False
-        for p in self.res.layer2.parameters(): 
-            p.requires_grad = False
-        for p in self.res.layer3.parameters(): 
-            p.requires_grad = False
-        for p in self.res.layer4.parameters(): 
-            p.requires_grad = False
-
+    def forward(self, x, epoch=-1):
+        if epoch < 15:
+            print(epoch, "freezing")
+            for p in self.res.layer1.parameters(): 
+                p.requires_grad = False
+            for p in self.res.layer2.parameters(): 
+                p.requires_grad = False
+            for p in self.res.layer3.parameters(): 
+                p.requires_grad = False
+            for p in self.res.layer4.parameters(): 
+                p.requires_grad = False
+        else:
+            print(epoch, "not freezing")
         x = self.res(x)      
         return x
 
@@ -159,15 +226,15 @@ class EfficientnetWithFinetuningWithVGGClassifier(t.nn.Module):
         self.flatten = t.nn.Flatten()
         
         self.vggclassifier = t.nn.Sequential(
-                t.nn.Linear(in_features=1792, out_features=1792, bias=True),
-                t.nn.ReLU(inplace=False),
-                t.nn.Dropout(p=0.5, inplace=False),
-                t.nn.Linear(in_features=1792, out_features=1792, bias=True),
-                t.nn.ReLU(inplace=False),
-                t.nn.Dropout(p=0.5, inplace=False),
-                t.nn.Linear(in_features=1792, out_features=1, bias=True),
-                t.nn.Sigmoid()
-            )
+                    t.nn.Linear(in_features=1792, out_features=1792, bias=True),
+                    t.nn.ReLU(inplace=False),
+                    t.nn.Dropout(p=0.5, inplace=False),
+                    t.nn.Linear(in_features=1792, out_features=1792, bias=True),
+                    t.nn.ReLU(inplace=False),
+                    t.nn.Dropout(p=0.5, inplace=False),
+                    t.nn.Linear(in_features=1792, out_features=1, bias=True),
+                    t.nn.Sigmoid())
+            
         
         for layer in self.vggclassifier:
             if isinstance(layer, t.nn.Linear):

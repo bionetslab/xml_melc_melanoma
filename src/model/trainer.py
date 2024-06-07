@@ -61,7 +61,7 @@ class Trainer:
         self._crit = self._crit.to(device)
 
 
-    def train_step(self, x, y):
+    def train_step(self, x, y, epoch):
         """
         Perform a single training step by: 1) resetting the gradients, 2) predicting the class of a sample, 
         3) calculating the loss, 4) computing the gradient by backpropagation, 5) updating the waits,
@@ -75,7 +75,7 @@ class Trainer:
             torch.Tensor: Loss value for the training step.
         """
         self._model.zero_grad()
-        outputs = self._model(x)        
+        outputs = self._model(x, epoch)        
         loss = self._crit(outputs, y)  
         loss.backward()
         self._optim.step()
@@ -98,7 +98,7 @@ class Trainer:
         binary_loss = self._crit(binary.float(), y)
         return loss, outputs, binary_loss
 
-    def train_epoch(self):
+    def train_epoch(self, epoch):
         """
         Train one epoch by 1) setting the training mode of the model, 2) calculating the average loss for each train step
 
@@ -116,7 +116,7 @@ class Trainer:
                 features, labels = next(train_dl_iter)
                 features = features.to(self._device)
                 labels = labels.to(self._device)
-                losses.append(self.train_step(features, labels))
+                losses.append(self.train_step(features, labels, epoch=epoch))
             except StopIteration:
                 break   
         losses = t.tensor(losses)
@@ -171,9 +171,14 @@ class Trainer:
                 except StopIteration:
                     break
         losses = t.tensor(losses)
-        binary_losses = t.tensor(binary_losses)
-        return t.mean(losses).numpy(), np.mean(f1_scores), np.mean(acc), t.mean(losses).numpy()
+        return t.mean(losses).numpy(), np.mean(f1_scores), np.mean(acc)
 
+    def write_val(self, f1, acc, val_loss, e):
+        self._writer.add_scalar(f"Val loss", val_loss, e)
+        self._writer.add_scalar(f"Val F1-score", f1, e)
+        self._writer.add_scalar(f"Val Accuracy", acc, e)
+        return
+        
     
     def train(self, epochs=50):
         """
@@ -199,53 +204,24 @@ class Trainer:
             if e == epochs:
                 print("breaking")
                 break
-            
-
-            train_loss = self.train_epoch()
+        
+            train_loss = self.train_epoch(epoch=e)
             if self._val_dl:
-                
-                val_loss_ret = self.val_test()
-                
-                f1 = val_loss_ret[1]
-                acc = val_loss_ret[2] 
-                val_loss = val_loss_ret[0]
-                binary_loss = val_loss_ret[3]
-                
+                val_loss, f1, acc = self.val_test()
                 self._scheduler.step()
+
                 if f1 > 0.7 or acc > 0.7:
                     if f1 > maxf1 and acc > maxacc:
                         maxf1 = f1
                         maxacc = acc
-                        t.save(self._model.state_dict(), f"model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
-                
-                self._writer.add_scalar(f"Val loss", val_loss, e)
-                self._writer.add_scalar(f"Binary val loss", binary_loss, e)
-                self._writer.add_scalar(f"Val F1-score", f1, e)
-                self._writer.add_scalar(f"Val Accuracy", acc, e)
+                        t.save(self._model.state_dict(), f"finetuning_model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
+                        
+                self.write_val(f1, acc, val_loss, e)
                 val_losses.append(val_loss)
 
             self._writer.add_scalar(f"Train loss", train_loss, e)
             self._writer.add_scalar(f"LR", self._scheduler.get_last_lr()[0], e)
             self._writer.flush()
-            
-            """
-            if e > self._early_stopping_patience:
-                # if train_losses[len(train_losses) - 1] == train_losses[
-                #     len(train_losses) - 2]:  # maybe use < and epsilon?
-                #     break
-                stop_early = True
-                for i in range(e - self._early_stopping_patience, e):
-                    if val_losses[i][0] > val_losses[e][0]:
-                        stop_early = False
-                        break
-                if stop_early:
-                    try:
-                        self.save_checkpoint(e)
-                    except:
-                        pass
-                    print(f"Stopping early: {val_losses}")
-                    break
-            """
             train_losses.append(train_loss)
             e += 1
         return train_losses, val_losses

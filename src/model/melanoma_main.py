@@ -77,66 +77,101 @@ def main():
     Main function for training the classifier.
 
     Parameters:
-    - classifier (bool): set to True for 1st experiment (Melanoma vs. Nevi) and to False for 2nd experiment (coarse tumor stage prediction)
+    - pretraining (bool): set to True for 1st experiment (Melanoma vs. Nevi) and to False for 2nd experiment (coarse tumor stage prediction)
     """
+    debugging = False
+    config_path = "../../config.json"
+   
+    pretraining = False
+    weight_decay = 0
+    lr = 5e-4
+    batch_size = 20
+    num_epochs = 30
+    device = "cuda:0"
+    
+    
+    if debugging:
+        print("++++++++++++++++++++++ DEBUGGING +++++++++++++++++++++++++++")
     
     idx = int(sys.argv[1])
-    val_samples = list(sys.argv[2:])
+    try:
+        val_samples = list(sys.argv[2:])
+        print(idx, val_samples)
+    except:
+        val_samples = None
     
-    print(idx, val_samples)
-    
-    config_path = "../../config.json"
     with open(config_path, "r") as f:
         configs = json.load(f)
         dataset_statistics = configs["dataset_statistics"]
         checkpoint_path = configs["model_weights"]
+        pretrained_model_path = configs["pretrained_model_path"]
 
-    classifier = True
-    weight_decay = 0
-    lr = 5e-4
-    batch_size = 20
-    num_epochs = 50
-    device = "cuda:0"
+    if debugging:
+        summary_writer_name = "test" #TODO
+    else:
+        summary_writer_name = f"finetuning_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
     
-    summary_writer_name = f"new_splits_cell_pretrained_model_conv1_only_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
-
-    if classifier:
+    if pretraining:
         data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False, config_path=config_path, pfs=False)
-        print(np.unique(data["Histo-ID"]))
         data = data.set_index("Histo-ID")
         data["split"] = "train"
-        data.loc[val_samples, "split"] = "val"
-        data = balance(data, variable="Group")
+        if val_samples:
+            data.loc[val_samples, "split"] = "val"
+            data = balance(data, variable="Group")
+        if debugging:
+            data = data.sample(10)
+            data["split"].iloc[:4] = "val"
         print(len(data))
         print(len(data[(data["split"] == "train") & (data["Group"] == "Nevus")]))
         print(len(data[(data["split"] == "train") & (data["Group"] == "Melanoma")]))
         print(len(data[(data["split"] == "val") & (data["Group"] == "Nevus")]))
         print(len(data[(data["split"] == "val") & (data["Group"] == "Melanoma")]))
-        data.to_csv(f"split_{idx}.csv")
+        #data.to_csv(f"split_{idx}.csv")
     else:
-        data = pd.read_csv("split.csv")
-        #data = get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=False)
-        data = data[data["Group"] == "Melanoma"]
-        data["Coarse tumor stage"] = data["Float tumor stage"] > 0.5
-        data = balance(data, split_by="split", variable="Coarse tumor stage")        
+        data = get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=False, config_path=config_path, pfs=True)
+        print(np.unique(data["Histo-ID"]))
+
+        data = data.set_index("Histo-ID")
+        data["split"] = "train"
+        if val_samples:
+            data.loc[val_samples, "split"] = "val"
+            train_data = balance(data[data["split"] == "train"], variable="PFS label")
+            print(np.unique(data[data["split"] == "val"].index))
+            data = pd.concat([data[data["split"] == "val"], train_data])
+            print(np.unique(train_data.index))
+        print(len(data))
+        print(np.unique(data.index))
+        print(len(data[(data["split"] == "train") & (data["PFS label"] == 0)]))
+        print(len(data[(data["split"] == "train") & (data["PFS label"] == 1)]))
+        print(len(data[(data["split"] == "val") & (data["PFS label"] == 0)]))
+        print(len(data[(data["split"] == "val") & (data["PFS label"] == 1)]))
+ 
 
     with open(os.path.join(dataset_statistics, f'melanoma_means.json'), 'r') as fp:
         means = json.load(fp)
     markers = list(means.keys())
 
-    tdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "train"], mode="train", config_path=config_path), batch_size=batch_size, shuffle=True)
-    vdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "val"], mode="val", config_path=config_path), batch_size=batch_size, shuffle=True)
-        
-    model = ResNet18_pretrained(indim=len(markers), cam=False, checkpoint_path=checkpoint_path)
-    #model = EfficientnetWithFinetuning(indim=len(markers))
-    #model.load_state_dict(t.load("/data_nfs/je30bery/melanoma_data/model/finetuned_effnet_with_LR_reduction_on_plateau.pt"), strict=False)
+    tdl = t.utils.data.DataLoader(MelanomaData(markers, pretraining, data[data["split"] == "train"], mode="train", config_path=config_path), batch_size=batch_size, shuffle=True)
+    if val_samples:
+        vdl = t.utils.data.DataLoader(MelanomaData(markers, pretraining, data[data["split"] == "val"], mode="val", config_path=config_path), batch_size=batch_size, shuffle=True)
+    else:
+        vdl = None
+    
+    if pretraining:
+        model = ResNet18_pretrained(indim=len(markers), cam=False, checkpoint_path=checkpoint_path)
+    else:
+        model = ResNet18_pretrained_for_finetuning(indim=len(markers), cam=False, checkpoint_path=checkpoint_path)
+        model.load_state_dict(t.load(pretrained_model_path), strict=False)
 
     crit = t.nn.BCELoss()
-    optim = t.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    if pretraining:
+        optim = t.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    else:
+        optim = t.optim.Adam(model.res.fc.parameters(), lr=lr, weight_decay=weight_decay)
 
     #scheduler = ReduceLROnPlateau(optim, patience=15)
     #scheduler = CosineAnnealingLR(optim, T_max=num_epochs, eta_min=1e-7)
-    scheduler = StepLR(optim, 15, gamma=0.5)
+    scheduler = StepLR(optim, 15, gamma=0.1)
 
     print(summary_writer_name)
     trainer = Trainer(model, 
@@ -151,7 +186,9 @@ def main():
     
     trainer.fit(epochs=num_epochs)
     model.eval()
-    t.save(model.state_dict(), f"../model/{idx}_{datetime.datetime.now()}.pt")
+    
+    if not debugging:
+        t.save(model.state_dict(), f"../model/finetuned_{idx}_{datetime.datetime.now()}.pt")
     print('done')
 
 if __name__ == "__main__":

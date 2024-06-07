@@ -44,14 +44,14 @@ class MelanomaData(Dataset):
 
     Args:
         markers (list): List of marker names.
-        classify (bool): True for Melanoma vs Nevi, False for Coarse tumor stage as label
+        pretrain (bool): True for Melanoma vs Nevi, False for Coarse tumor stage as label
         data (DataFrame): DataFrame containing the dataset, as for example produced by src/data_utils/get_data_csv()
         mode (str, optional): The mode of operation, one of "train", "val", or "segment". Defaults to "train".
         in "train" mode, the data is augmented, whereas it is only resized and normalized in "val" mode. "segment" mode just returns the original images.
         size (int, optional): Size of the resized images. Defaults to 512.
 
     Attributes:
-        _classify (bool): Flag indicating the task.
+        _pretrain (bool): Flag indicating the task.
         _config (dict): The global config file
         _means (dict): Dictionary containing means of marker values.
         _stds (dict): Dictionary containing standard deviations of marker values.
@@ -61,9 +61,9 @@ class MelanomaData(Dataset):
         _resize_and_normalize (torchvision.transforms.Compose): Composed torchvision transforms for resizing and normalization.
         _transforms (torchvision.transforms.Compose): Composed torchvision transforms for data augmentation.
     """
-    def __init__(self, markers, classify, data, mode="train", size=512, config_path="/data_nfs/je30bery/melanoma_data/config.json"):
+    def __init__(self, markers, pretrain, data, mode="train", size=512, config_path="/data_nfs/je30bery/melanoma_data/config.json"):
         assert mode in ["train", "val", "segment"]
-        self._classify = classify
+        self._pretrain = pretrain
         
         with open(config_path, 'r') as f:
             self._config = json.load(f)
@@ -134,11 +134,11 @@ class MelanomaData(Dataset):
         """
         sample = os.path.join(self._config["melanoma_data"], self._data.iloc[index]["file_path"])
 
-        if self._classify:
+        if self._pretrain:
             label = float(self._data.iloc[index]["Group"] == "Melanoma")
             label = np.array(float(label))
         else:
-            label = float(self._data.iloc[index]["Coarse tumor stage"])
+            label = float(self._data.iloc[index]["PFS label"])
             label = np.array(float(label))
   
         label = t.from_numpy(label).float().unsqueeze(0)
