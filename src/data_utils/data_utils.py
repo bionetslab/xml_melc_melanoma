@@ -18,7 +18,7 @@ def get_high_quality_samples(path):
     high_quality = k[np.where(v == "2")]
     return high_quality
     
-def get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=True, config_path="/data_nfs/je30bery/melanoma_data/config.json"):    
+def get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=True, pfs=True, config_path="/data_nfs/je30bery/melanoma_data/config.json"):    
     """
     Load clinical data from a CSV file based on specified criteria.
 
@@ -60,4 +60,39 @@ def get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=True
                 'T4b N1b':4/4}
     data["Float tumor stage"] = data["Tumor stage"].apply(lambda x: float_ts[x])
 
+    if pfs:
+        PFS_data = pd.read_csv(configs["pfs_data"])
+        PFS_data.set_index("Histo-ID", inplace=True)
+    
+        data["Patient ID"] = data["Histo-ID"].apply(lambda x: get_val(PFS_data, x, "Patienten-Nr."))
+        data["PFS label"] = data["Histo-ID"].apply(lambda x: get_val(PFS_data, x, "PFS label"))
+        data = data.dropna(subset=["PFS label"])
+        
     return data
+
+
+def get_val(PFS_data, histo_id, column):
+    if histo_id in PFS_data.index:
+        return PFS_data.loc[histo_id, column]
+    else:
+        return np.nan
+
+def coarse_loc(x):
+    if "thorakal" in x:
+        return 0
+    if "abdominal" in x or "adbominal" in x:
+        return 1
+    if "Rücken" in x:
+        return 2
+    if "Arm" in x or "Capillitium" in x:
+        return 3
+    if "Bein" in x:
+        return 4
+
+def left_right(x):
+    if "rechts" in x:
+        return -1
+    if "links" in x:
+        return 1
+    else:
+        return 0

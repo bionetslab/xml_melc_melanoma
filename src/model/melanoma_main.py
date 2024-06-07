@@ -92,20 +92,26 @@ def main():
         checkpoint_path = configs["model_weights"]
 
     classifier = True
-    weight_decay = 1e-6
+    weight_decay = 0
     lr = 5e-4
     batch_size = 20
     num_epochs = 50
     device = "cuda:0"
     
-    summary_writer_name = f"cell_pretrained_model_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
+    summary_writer_name = f"new_splits_cell_pretrained_model_conv1_only_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
 
     if classifier:
-        data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False, config_path=config_path)
+        data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False, config_path=config_path, pfs=False)
+        print(np.unique(data["Histo-ID"]))
         data = data.set_index("Histo-ID")
         data["split"] = "train"
         data.loc[val_samples, "split"] = "val"
         data = balance(data, variable="Group")
+        print(len(data))
+        print(len(data[(data["split"] == "train") & (data["Group"] == "Nevus")]))
+        print(len(data[(data["split"] == "train") & (data["Group"] == "Melanoma")]))
+        print(len(data[(data["split"] == "val") & (data["Group"] == "Nevus")]))
+        print(len(data[(data["split"] == "val") & (data["Group"] == "Melanoma")]))
         data.to_csv(f"split_{idx}.csv")
     else:
         data = pd.read_csv("split.csv")
@@ -118,11 +124,9 @@ def main():
         means = json.load(fp)
     markers = list(means.keys())
 
-    print(len(data))
-    vdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "train"], mode="train", config_path=config_path), batch_size=batch_size, shuffle=True)
-    tdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "val"], mode="val", config_path=config_path), batch_size=batch_size, shuffle=True)
-    
-    checkpoint_path
+    tdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "train"], mode="train", config_path=config_path), batch_size=batch_size, shuffle=True)
+    vdl = t.utils.data.DataLoader(MelanomaData(markers, classifier, data[data["split"] == "val"], mode="val", config_path=config_path), batch_size=batch_size, shuffle=True)
+        
     model = ResNet18_pretrained(indim=len(markers), cam=False, checkpoint_path=checkpoint_path)
     #model = EfficientnetWithFinetuning(indim=len(markers))
     #model.load_state_dict(t.load("/data_nfs/je30bery/melanoma_data/model/finetuned_effnet_with_LR_reduction_on_plateau.pt"), strict=False)
@@ -130,9 +134,9 @@ def main():
     crit = t.nn.BCELoss()
     optim = t.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    scheduler = ReduceLROnPlateau(optim, patience=10)
+    #scheduler = ReduceLROnPlateau(optim, patience=15)
     #scheduler = CosineAnnealingLR(optim, T_max=num_epochs, eta_min=1e-7)
-    #scheduler = StepLR(optim, 5, gamma=0.5)
+    scheduler = StepLR(optim, 15, gamma=0.5)
 
     print(summary_writer_name)
     trainer = Trainer(model, 

@@ -23,7 +23,7 @@ class ResNet18_pretrained(t.nn.Module):
         # re-use layers of efficientnet_b4 (good ratio of #parameters and performance on ImageNet)
         self.res = resnet18(weights=None)
         #print(res)
-        checkpoint = t.load(checkpoint_path)
+        checkpoint = t.load(checkpoint_path, map_location="cpu")
         new_state_dict = {}
         for key, value in checkpoint['state_dict'].items():
             new_key = key.replace("model.resnet.", "")
@@ -47,8 +47,15 @@ class ResNet18_pretrained(t.nn.Module):
                 
 
     def forward(self, x):
-        #for p in self.features[1:7].parameters(): 
-        #    p.requires_grad = False
+        for p in self.res.layer1.parameters(): 
+            p.requires_grad = False
+        for p in self.res.layer2.parameters(): 
+            p.requires_grad = False
+        for p in self.res.layer3.parameters(): 
+            p.requires_grad = False
+        for p in self.res.layer4.parameters(): 
+            p.requires_grad = False
+
         x = self.res(x)      
         return x
 

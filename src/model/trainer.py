@@ -4,11 +4,8 @@ import torch as t
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 import copy
-
 import datetime
  
-
-
 from sklearn.model_selection import train_test_split
 
 
@@ -97,7 +94,9 @@ class Trainer:
         """
         outputs = self._model(x)
         loss = self._crit(outputs, y)
-        return loss, outputs
+        binary = outputs > 0.5
+        binary_loss = self._crit(binary.float(), y)
+        return loss, outputs, binary_loss
 
     def train_epoch(self):
         """
@@ -134,6 +133,7 @@ class Trainer:
         self._model.eval()
        
         losses = []
+        binary_losses = []
         f1_scores = []
         acc = []
         
@@ -150,8 +150,9 @@ class Trainer:
                     labels = labels.to(self._device)
 
 
-                    loss, predictions = self.val_test_step(features, labels)
+                    loss, predictions, binary_loss = self.val_test_step(features, labels)
                     losses.append(loss)
+                    binary_losses.append(binary_loss)
                                         
                     predictions_np = predictions.detach().cpu().numpy()
                     predictions_np = predictions_np > 0.5
@@ -170,7 +171,8 @@ class Trainer:
                 except StopIteration:
                     break
         losses = t.tensor(losses)
-        return t.mean(losses).numpy(), np.mean(f1_scores), np.mean(acc)
+        binary_losses = t.tensor(binary_losses)
+        return t.mean(losses).numpy(), np.mean(f1_scores), np.mean(acc), t.mean(losses).numpy()
 
     
     def train(self, epochs=50):
@@ -200,24 +202,29 @@ class Trainer:
             
 
             train_loss = self.train_epoch()
-            val_loss_ret = self.val_test()
-            
-            f1 = val_loss_ret[1]
-            acc = val_loss_ret[2] 
-            val_loss = val_loss_ret[0]
-            
-            self._scheduler.step(val_loss)
-            if f1 > 0.7 or acc > 0.7:
-                if f1 > maxf1 and acc > maxacc:
-                    maxf1 = f1
-                    maxacc = acc
-                    t.save(self._model.state_dict(), f"model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
-            
-            
+            if self._val_dl:
+                
+                val_loss_ret = self.val_test()
+                
+                f1 = val_loss_ret[1]
+                acc = val_loss_ret[2] 
+                val_loss = val_loss_ret[0]
+                binary_loss = val_loss_ret[3]
+                
+                self._scheduler.step()
+                if f1 > 0.7 or acc > 0.7:
+                    if f1 > maxf1 and acc > maxacc:
+                        maxf1 = f1
+                        maxacc = acc
+                        t.save(self._model.state_dict(), f"model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
+                
+                self._writer.add_scalar(f"Val loss", val_loss, e)
+                self._writer.add_scalar(f"Binary val loss", binary_loss, e)
+                self._writer.add_scalar(f"Val F1-score", f1, e)
+                self._writer.add_scalar(f"Val Accuracy", acc, e)
+                val_losses.append(val_loss)
+
             self._writer.add_scalar(f"Train loss", train_loss, e)
-            self._writer.add_scalar(f"Val loss", val_loss, e)
-            self._writer.add_scalar(f"Val F1-score", f1, e)
-            self._writer.add_scalar(f"Val Accuracy", acc, e)
             self._writer.add_scalar(f"LR", self._scheduler.get_last_lr()[0], e)
             self._writer.flush()
             
@@ -240,7 +247,6 @@ class Trainer:
                     break
             """
             train_losses.append(train_loss)
-            val_losses.append(val_loss)
             e += 1
         return train_losses, val_losses
             
