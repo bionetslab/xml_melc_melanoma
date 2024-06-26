@@ -3,6 +3,34 @@ import os
 import numpy as np
 import json
 
+def balance(pat_data, split_by="split", variable="Label"):
+    """
+    Balance the dataset by oversampling minority classes.
+
+    Parameters:
+    - pat_data (DataFrame): DataFrame containing the dataset.
+    - split_by (str): The column name for splitting the dataset.
+    - variable (str): The variable to balance.
+
+    Returns:
+    - balanced_data (DataFrame): DataFrame with balanced classes.
+    """
+    values = np.unique(pat_data[variable])
+    for split in np.unique(pat_data[split_by]):
+        split_data = pat_data[pat_data[split_by] == split]
+        v, c = np.unique(split_data[variable], return_counts=True)
+        if len(v) != len(values):
+            raise ValueError("Split rejected, a split group does not contain samples of all variables")
+        max_count = np.max(c)
+        for val, count in zip(v, c):
+            diff = max_count - count
+            if diff == 0:
+                continue
+            over_sampled = split_data[split_data[variable] == val].sample(diff, replace=True)
+            pat_data = pd.concat([pat_data, over_sampled])
+    return pat_data
+
+
 def get_high_quality_samples(path):    
     """ 
     Get high-quality samples
@@ -67,7 +95,8 @@ def get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=True
         data["Patient ID"] = data["Histo-ID"].apply(lambda x: get_val(PFS_data, x, "Patienten-Nr."))
         data["PFS label"] = data["Histo-ID"].apply(lambda x: get_val(PFS_data, x, "PFS label"))
         data = data.dropna(subset=["PFS label"])
-        
+        data["PFS label"] = 1 - data["PFS label"]
+    
     return data
 
 

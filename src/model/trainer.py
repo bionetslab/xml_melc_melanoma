@@ -56,6 +56,7 @@ class Trainer:
         self._device = device
         if summary_writer_name == None:
             summary_writer_name = datetime.datetime.now()
+        self._summary_writer_name = summary_writer_name
         self._writer = SummaryWriter(f"runs/{summary_writer_name}")
         self._model = self._model.to(device)
         self._crit = self._crit.to(device)
@@ -113,7 +114,7 @@ class Trainer:
             
         while True:
             try:
-                features, labels = next(train_dl_iter)
+                features, labels, _ = next(train_dl_iter)
                 features = features.to(self._device)
                 labels = labels.to(self._device)
                 losses.append(self.train_step(features, labels, epoch=epoch))
@@ -136,6 +137,9 @@ class Trainer:
         binary_losses = []
         f1_scores = []
         acc = []
+        batch_ids = list()
+        batch_predictions = list()
+        batch_labels = list()
         
         
         val_dl_iter = iter(self._val_dl)
@@ -143,7 +147,7 @@ class Trainer:
         with t.no_grad():
             while True:
                 try:
-                    features, labels = next(val_dl_iter)
+                    features, labels, ids = next(val_dl_iter)
                     l = np.array(copy.deepcopy(labels))
 
                     features = features.to(self._device)
@@ -157,6 +161,9 @@ class Trainer:
                     predictions_np = predictions.detach().cpu().numpy()
                     predictions_np = predictions_np > 0.5
                     
+                    batch_ids.append(np.array(ids))
+                    batch_predictions.append(predictions_np)
+                    batch_labels.append(l)
                     #if np.sum(l[pos_labels]) > 0 and np.sum(np.invert(l.astype(bool))[neg_labels]) > 0:
                     #    pos_labels = np.where(l == 1)
                     #    pos_acc = np.sum(predictions_np[pos_labels]) / np.sum(l[pos_labels])
@@ -170,13 +177,26 @@ class Trainer:
                     
                 except StopIteration:
                     break
-        losses = t.tensor(losses)
-        return t.mean(losses).numpy(), np.mean(f1_scores), np.mean(acc)
 
-    def write_val(self, f1, acc, val_loss, e):
+        batch_ids = np.concatenate(batch_ids)
+        batch_predictions = np.concatenate(batch_predictions)
+        batch_labels = np.concatenate(batch_labels)
+        
+        majority_acc = list()
+        
+        for id in np.unique(batch_ids):
+            label = np.mean(batch_labels[np.where(batch_ids == id)]) >= 0.5
+            prediction = np.mean(batch_predictions[np.where(batch_ids == id)]) >= 0.5
+            majority_acc.append((label == prediction))
+        losses = t.tensor(losses)
+        return t.mean(losses).numpy(), np.mean(f1_scores), np.mean(acc), np.mean(majority_acc)
+
+    def write_val(self, f1, acc, val_loss, majority_acc, e):
         self._writer.add_scalar(f"Val loss", val_loss, e)
         self._writer.add_scalar(f"Val F1-score", f1, e)
         self._writer.add_scalar(f"Val Accuracy", acc, e)
+        self._writer.add_scalar(f"Val Majority Accuracy", majority_acc, e)
+
         return
         
     
@@ -207,16 +227,13 @@ class Trainer:
         
             train_loss = self.train_epoch(epoch=e)
             if self._val_dl:
-                val_loss, f1, acc = self.val_test()
+                val_loss, f1, acc, majority_acc = self.val_test()
                 self._scheduler.step()
 
-                if f1 > 0.7 or acc > 0.7:
-                    if f1 > maxf1 and acc > maxacc:
-                        maxf1 = f1
-                        maxacc = acc
-                        t.save(self._model.state_dict(), f"finetuning_model_{datetime.datetime.now()}_f1={f1}_acc={acc}_{e}.pt")
+                if e == 4:
+                    t.save(self._model.state_dict(), f"epoch_4_{self._summary_writer_name}_f1={f1}_acc={acc}_{e}.pt")
                         
-                self.write_val(f1, acc, val_loss, e)
+                self.write_val(f1, acc, val_loss, majority_acc, e)
                 val_losses.append(val_loss)
 
             self._writer.add_scalar(f"Train loss", train_loss, e)

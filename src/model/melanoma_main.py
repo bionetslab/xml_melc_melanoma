@@ -12,33 +12,6 @@ from src import *
 
 t.manual_seed(0)
 
-def balance(pat_data, split_by="split", variable="Label"):
-    """
-    Balance the dataset by oversampling minority classes.
-
-    Parameters:
-    - pat_data (DataFrame): DataFrame containing the dataset.
-    - split_by (str): The column name for splitting the dataset.
-    - variable (str): The variable to balance.
-
-    Returns:
-    - balanced_data (DataFrame): DataFrame with balanced classes.
-    """
-    values = np.unique(pat_data[variable])
-    for split in np.unique(pat_data[split_by]):
-        split_data = pat_data[pat_data[split_by] == split]
-        v, c = np.unique(split_data[variable], return_counts=True)
-        if len(v) != len(values):
-            raise ValueError("Split rejected, a split group does not contain samples of all variables")
-        max_count = np.max(c)
-        for val, count in zip(v, c):
-            diff = max_count - count
-            if diff == 0:
-                continue
-            over_sampled = split_data[split_data[variable] == val].sample(diff, replace=True)
-            pat_data = pd.concat([pat_data, over_sampled])
-    return pat_data
-
 
 def get_data(data, splits = {"train": 0.8, "val": 0.2}, balance_by="Group"):
     """
@@ -84,10 +57,11 @@ def main():
    
     pretraining = False
     weight_decay = 0
-    lr = 5e-4
+    lr = 1e-3
     batch_size = 20
-    num_epochs = 30
+    num_epochs = 5
     device = "cuda:0"
+    patience = 5
     
     
     if debugging:
@@ -109,7 +83,7 @@ def main():
     if debugging:
         summary_writer_name = "test" #TODO
     else:
-        summary_writer_name = f"finetuning_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
+        summary_writer_name = f"finetuning_final_split={str(idx)}_lr={lr}_wd={weight_decay}_bs={batch_size}"
     
     if pretraining:
         data = get_data_csv(dataset="Melanoma", groups=["Melanoma", "Nevus"], high_quality_only=False, config_path=config_path, pfs=False)
@@ -145,7 +119,8 @@ def main():
         print(len(data[(data["split"] == "train") & (data["PFS label"] == 1)]))
         print(len(data[(data["split"] == "val") & (data["PFS label"] == 0)]))
         print(len(data[(data["split"] == "val") & (data["PFS label"] == 1)]))
- 
+    
+    data.reset_index(inplace=True)
 
     with open(os.path.join(dataset_statistics, f'melanoma_means.json'), 'r') as fp:
         means = json.load(fp)
@@ -171,7 +146,7 @@ def main():
 
     #scheduler = ReduceLROnPlateau(optim, patience=15)
     #scheduler = CosineAnnealingLR(optim, T_max=num_epochs, eta_min=1e-7)
-    scheduler = StepLR(optim, 15, gamma=0.1)
+    scheduler = StepLR(optim, patience, gamma=0.1)
 
     print(summary_writer_name)
     trainer = Trainer(model, 
@@ -186,6 +161,7 @@ def main():
     
     trainer.fit(epochs=num_epochs)
     model.eval()
+    
     
     if not debugging:
         t.save(model.state_dict(), f"../model/finetuned_{idx}_{datetime.datetime.now()}.pt")

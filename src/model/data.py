@@ -157,6 +157,8 @@ class MelanomaData(Dataset):
             tens = self._transforms(tens)
 
         tens = tens.float()
-        return tens, label
+        id = self._data.iloc[index]["Histo-ID"] 
+        return tens, label, id
         
+
 
