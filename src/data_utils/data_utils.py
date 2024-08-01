@@ -31,21 +31,7 @@ def balance(pat_data, split_by="split", variable="Label"):
     return pat_data
 
 
-def get_high_quality_samples(path):    
-    """ 
-    Get high-quality samples
 
-    Parameters:
-    - path (str): The path to the dictionairy containing quality information.
-    Returns:
-    - high_quality (array): Array containing high-quality sample fovs.
-    """
-    quality_dict = np.load(path, allow_pickle=True).item()
-    k = np.array(list(quality_dict.keys()))
-    v = np.array(list(quality_dict.values()))
-    high_quality = k[np.where(v == "2")]
-    return high_quality
-    
 def get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=True, pfs=True, config_path="/data_nfs/je30bery/melanoma_data/config.json"):    
     """
     Load clinical data from a CSV file based on specified criteria.
@@ -62,41 +48,10 @@ def get_data_csv(dataset="Melanoma", groups=["Melanoma"], high_quality_only=True
     with open(config_path, 'r') as f:
         configs = json.load(f)
     data = pd.read_csv(configs["clinical_data"])
-
-    data = data[data["Dataset"] == dataset]
-    data = data[~data["file_path"].isna()]
-    data = data[data["Group"].isin(groups)]
-
-    data["Collection year"] = data["Collection data"].apply(lambda x: x[-4:])
-    data["Imaging year"] = data["file_path"].apply(lambda x: x.split("_")[2][:4])
-
-    data = data[(data["Group"] == "Nevus") | (data["Tumor stage"].notna())]
-
-
     if high_quality_only:
-        high_quality = get_high_quality_samples(configs["high_quality_samples"])
-        data = data[data["file_path"].isin(high_quality)]
-    float_ts = {np.nan: 0,
-                'T1a':1/4,
-                'T1b':1/4,
-                'T2a':2/4,
-                'T2b':2/4,
-                'T3a':3/4,
-                'T3b':3/4,
-                'T4a':4/4,
-                'T4b':4/4,
-                'T4b N1b':4/4}
-    data["Float tumor stage"] = data["Tumor stage"].apply(lambda x: float_ts[x])
-
+        data = data[data["High-quality segmentation result"] == True]
     if pfs:
-        PFS_data = pd.read_csv(configs["pfs_data"])
-        PFS_data.set_index("Histo-ID", inplace=True)
-    
-        data["Patient ID"] = data["Histo-ID"].apply(lambda x: get_val(PFS_data, x, "Patienten-Nr."))
-        data["PFS label"] = data["Histo-ID"].apply(lambda x: get_val(PFS_data, x, "PFS label"))
-        data = data.dropna(subset=["PFS label"])
-        data["PFS label"] = 1 - data["PFS label"]
-    
+        data = data[data["PFS < 5"].isin([True, False])]
     return data
 
 
