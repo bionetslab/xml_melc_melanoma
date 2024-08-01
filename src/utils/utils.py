@@ -24,7 +24,6 @@ def print_metrics(y_true, y_pred):
     print(f'Sensitivity (Recall): {sensitivity}')
     specificity = tn / (tn + fp)
     print(f'Specificity: {specificity}')
-
     
 
 def get_scalar_run_tensorboard(tag, filepath):
