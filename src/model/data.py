@@ -46,8 +46,8 @@ class MelanomaData(Dataset):
         markers (list): List of marker names.
         pretrain (bool): True for Melanoma vs Nevi, False for Coarse tumor stage as label
         data (DataFrame): DataFrame containing the dataset, as for example produced by src/data_utils/get_data_csv()
-        mode (str, optional): The mode of operation, one of "train", "val", or "segment". Defaults to "train".
-        in "train" mode, the data is augmented, whereas it is only resized and normalized in "val" mode. "segment" mode just returns the original images.
+        mode (str, optional): The mode of operation, one of "train", "val". Defaults to "train".
+        in "train" mode, the data is augmented, whereas it is only resized and normalized in "val" mode. 
         size (int, optional): Size of the resized images. Defaults to 512.
 
     Attributes:
@@ -62,7 +62,7 @@ class MelanomaData(Dataset):
         _transforms (torchvision.transforms.Compose): Composed torchvision transforms for data augmentation.
     """
     def __init__(self, markers, pretrain, data, mode="train", size=512, config_path="/data_nfs/je30bery/melanoma_data/config.json"):
-        assert mode in ["train", "val", "segment"]
+        assert mode in ["train", "val"]
         self._pretrain = pretrain
         
         with open(config_path, 'r') as f:
@@ -118,7 +118,7 @@ class MelanomaData(Dataset):
             img = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
             img = img.astype("float64") / 255.
         except IndexError:
-                img = np.full((2018, 2018), self._means[channel])
+                img = np.full((self._size, self._size), self._means[channel])
         return img
         
     
@@ -130,26 +130,24 @@ class MelanomaData(Dataset):
             index (int): Index of the sample.
 
         Returns:
-            tuple: A tuple containing the tensor image data and its label in train and val mode. In segment mode, only the image is returned.
+            tuple: A tuple containing the tensor image data and its label in train and val mode. 
         """
-        sample = os.path.join(self._config["melanoma_data"], self._data.iloc[index]["file_path"])
+        sample = os.path.join(self._config["melanoma_data"], self._data.iloc[index]["Sample"]) #TODO
 
         if self._pretrain:
-            label = float(self._data.iloc[index]["Group"] == "Melanoma")
+            label = float("Melanoma" in self._data.iloc[index]["Group"])
             label = np.array(float(label))
         else:
-            label = float(self._data.iloc[index]["PFS label"])
+            label = float(self._data.iloc[index]["PFS < 5"])
             label = np.array(float(label))
+            print(label, self._data.iloc[index]["PFS < 5"])
   
         label = t.from_numpy(label).float().unsqueeze(0)
         img_files = list()
         for ch in self._markers:
             img_files.append(self._get_channel(sample, ch))
         
-        img_files = np.array(img_files)
-        if self._mode == "segment":
-            return img_files
-            
+        img_files = np.array(img_files)           
         tens = t.from_numpy(img_files)
         tens = self._resize_and_normalize(tens)
             
@@ -157,7 +155,7 @@ class MelanomaData(Dataset):
             tens = self._transforms(tens)
 
         tens = tens.float()
-        id = self._data.iloc[index]["Histo-ID"] 
+        id = self._data.iloc[index]["Histo ID"] 
         return tens, label, id
         
 

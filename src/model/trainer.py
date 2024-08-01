@@ -76,7 +76,7 @@ class Trainer:
             torch.Tensor: Loss value for the training step.
         """
         self._model.zero_grad()
-        outputs = self._model(x, epoch)        
+        outputs = self._model(x, epoch)    
         loss = self._crit(outputs, y)  
         loss.backward()
         self._optim.step()
@@ -229,10 +229,6 @@ class Trainer:
             if self._val_dl:
                 val_loss, f1, acc, majority_acc = self.val_test()
                 self._scheduler.step()
-
-                if e == 4:
-                    t.save(self._model.state_dict(), f"epoch_4_{self._summary_writer_name}_f1={f1}_acc={acc}_{e}.pt")
-                        
                 self.write_val(f1, acc, val_loss, majority_acc, e)
                 val_losses.append(val_loss)
 
