@@ -140,7 +140,6 @@ class MelanomaData(Dataset):
         else:
             label = float(self._data.iloc[index]["PFS < 5"])
             label = np.array(float(label))
-            print(label, self._data.iloc[index]["PFS < 5"])
   
         label = t.from_numpy(label).float().unsqueeze(0)
         img_files = list()
