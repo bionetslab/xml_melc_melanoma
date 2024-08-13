@@ -7,7 +7,7 @@ from tqdm import tqdm
 import pickle
 import anndata as ad
 import sys
-sys.path.append("..")
+sys.path.append("../")
 from src import *
 
 import argparse
@@ -37,14 +37,15 @@ def main():
     data_path = get_config_value(config, "melanoma_data")
     seg_results_path = get_config_value(config, "segmentation_results") 
     antibody_mapping_path = get_config_value(config, "antibody_gene_mapping")
-    segment = get_config_value(config, "segment")
-    assert segment in ["nucleus", "cell"], "please choose \"cell\" or \"nuclues\" as segment"
-    
+    hpa_data_path = get_config_value(config, "hpa_data")
+    segment = "cell"
     
     with open(antibody_mapping_path) as f:
         antibody_gene_symbols = json.load(f)
-
-    seg = MELC_Segmentation(data_path, membrane_markers=["CD45"]) 
+        
+    print("getting reference data")
+    reference = get_hpa_reference("skin", hpa_data_path)
+    print("done")
     os.makedirs(os.path.join(seg_results_path, "anndata_files"), exist_ok=True)
     result_dict = dict()
 
@@ -52,45 +53,56 @@ def main():
     EA.run(segment=segment, profile=None)
 
     expression_data = EA.expression_data.sort_index()
-
-    for i, fov in enumerate(tqdm(seg.fields_of_view)):
-        if os.path.exists(os.path.join(seg_results_path, "anndata_files", f"adata_{segment}_{fov}.pickle")):
-            continue
-
-        seg.field_of_view = fov
+    #data = get_data_csv(groups=["Melanoma"], high_quality_only=False, pfs=False, config_path=config_path)
+    data = get_data_csv(groups=["Melanoma"], high_quality_only=True, pfs=True, config_path=config_path)
+    #data = data.set_index("Sample")
+    dfs = dict()
+    markers_used_for_assignment = None
+    for i, sample in tqdm(enumerate(data["Sample"])):
+        exp_fov = expression_data.loc[sample].copy()
+        exp_fov = exp_fov.drop(["Sample", "Group", "Index", "Field of View", "Bcl-2"], axis=1)
+        exp_fov = exp_fov.dropna(axis="columns", how="any")
         
-        with open(os.path.join(seg_results_path, f"{fov}_nucleus.pickle"), "rb") as handle:
-            where_nuc = pickle.load(handle)
-        with open(os.path.join(seg_results_path, f"{fov}_cell.pickle"), "rb") as handle:
-            where_cell = pickle.load(handle)
+        df = pd.DataFrame()
+        for c in exp_fov.columns:
+            if c in ["CD45RA", "CD45RO", "PPB", 'CD66abce']:
+                continue
+            symbol = antibody_gene_symbols[c]
+            if isinstance(symbol, list):
+                for s in symbol:
+                    df[s] = exp_fov[c]
+            else:
+                df[symbol] = exp_fov[c]
+        dfs[sample] = df
 
-        where_dict = where_nuc if segment == "nucleus" else where_cell   
-        where_dict = dict(sorted(where_dict.items()))   
-        
-        exp_fov = expression_data.loc[fov].copy()
-        exp_fov = exp_fov.drop(["Sample", "Group"], axis=1)
+        if markers_used_for_assignment is None:
+            markers_used_for_assignment = df.columns
+        else:
+            markers_used_for_assignment = list(set(markers_used_for_assignment) & set(list(df.columns)))
+
     
-        adata = ad.AnnData(exp_fov)
-        adata.var = pd.DataFrame(np.array(exp_fov.columns), columns=["gene_symbol"])
+    for i, sample in tqdm(enumerate(dfs.keys())):
+        df = dfs[sample][markers_used_for_assignment]
+        segmented = os.path.join(seg_results_path, f'{sample}_cell.npy')
+        with open(segmented, "rb") as openfile:
+            seg_file = np.load(openfile)
         
-        #adata.obsm["cellLabelInImage"] = np.array([int(a) for a in list(exp_fov.index)])
-
-        #adata.varm["antibody"] = pd.DataFrame(exp_fov.columns, columns=["antibody"])
-        #adata.obsm["cellSize"] = np.array([len(where_dict[k][0]) for k in where_dict])      
-        #adata.obsm["Group"] = np.array([group] * len(adata.obsm["cellSize"]))
-                
-        #adata.uns["patient_id"] = pat_id
-
-        #adata.obsm["patient_label"] = np.array([pat_id] * len(adata.obsm["cellSize"]))
-        adata.obsm["field_of_view"] = np.array([fov] * exp_fov.shape[0]) 
-        #adata.uns["cell_coordinates"] = where_dict
-        #adata.uns["spatial"]["segmentation"] = nuc if segment == "nuclei" else cell
-
-        result_dict[i] = adata
+        adata = ad.AnnData(df)
+        adata.var = pd.DataFrame(np.array(df.columns), columns=["gene_symbol"])#
+        adata.var_names = df.columns
+        adata.uns["segmentation"] = seg_file
+        adata.obsm["field_of_view"] = np.array([sample] * df.shape[0]) 
         
-    with open(os.path.join(seg_results_path, "anndata_files", f"adata_{segment}.pickle"), 'wb') as handle:
+        tree = identify_cell_types(adata, reference[markers_used_for_assignment].copy(), min_fold_change=2, z_score_cutoff=1.96/4)
+        adata.uns["cell_type_assignment_tree"] = tree
+        result_dict[sample] = adata
+        
+    print(len(result_dict))
+    ad_dir = os.path.join(seg_results_path, "anndata_files")
+    os.makedirs(ad_dir, exist_ok=True)
+    with open(os.path.join(ad_dir, f"adata_{segment}.pickle"), 'wb') as handle:
         pickle.dump(result_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        
+    print("wrote", os.path.join(ad_dir, f"adata_{segment}.pickle"))
     
 if __name__ == "__main__":
     main()

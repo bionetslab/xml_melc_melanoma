@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib
 import sys
 
 sys.path.append("..")
@@ -74,16 +73,20 @@ class ExpressionAnalyzer:
                 except Exception as e:
                     print(fov, e)
                     continue
-                
+            
                 
             nuclei_pickle_path = os.path.join(self.segmentation_results_dir, f"{fov}_nucleus.pickle")
             if not os.path.exists(nuclei_pickle_path):
-                with open(nuclei_pickle_path, 'wb') as handle:
-                    pickle.dump(self.seg.nucleus_label_where[fov], handle, protocol=pickle.HIGHEST_PROTOCOL)
-                with open(os.path.join(self.segmentation_results_dir, f"{fov}_cell.pickle"), 'wb') as handle:
-                    pickle.dump(self.seg.membrane_label_where[fov], handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    
+                try:
+                    self.seg.field_of_view = fov
+                    nuc, mem, _, _ = self.seg.run(fov, self.radii_ratio)
+                    with open(nuclei_pickle_path, 'wb') as handle:
+                        pickle.dump(self.seg.nucleus_label_where[fov], handle, protocol=pickle.HIGHEST_PROTOCOL)
+                    with open(os.path.join(self.segmentation_results_dir, f"{fov}_cell.pickle"), 'wb') as handle:
+                        pickle.dump(self.seg.membrane_label_where[fov], handle, protocol=pickle.HIGHEST_PROTOCOL)
+                except:
+                    print(fov)
+        
     def get_expression_per_marker_and_sample(self, adaptive, where_dict):
         """
         Calculate expression for markers and samples.
@@ -116,6 +119,7 @@ class ExpressionAnalyzer:
 
         """
         result_dfs = dict()
+        print(self.seg.fields_of_view)
         for fov in tqdm(self.seg.fields_of_view, desc="Calculating expression"):
             os.makedirs(os.path.join(self.segmentation_results_dir, f"marker_expression_{segment}_results/"), exist_ok=True)
             expression_result_path = os.path.join(self.segmentation_results_dir, f"marker_expression_{segment}_results/{fov}.pkl")
@@ -185,6 +189,7 @@ class ExpressionAnalyzer:
                 df.to_pickle(expression_result_path)
 
             else:
+                print("read", expression_result_path)
                 df = pd.read_pickle(expression_result_path)
                     
             

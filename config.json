@@ -1,0 +1,14 @@
+{
+    "melanoma_data": "/data_nfs/datasets/melc/melanoma/resized/",
+    "clinical_data":   "/data_nfs/datasets/melc/melanoma/old_and_new_metadata.csv", 
+    "antibody_gene_mapping": "/data_nfs/je30bery/melanoma_data/data/antibody_gene_mapping/antibodies.json",
+    "segmentation_results": "/data_nfs/datasets/melc/melanoma/segmented",
+    "anndata_file": "/data_nfs/datasets/melc/melanoma/segmented/anndata_files/adata_cell.pickle",
+    "dataset_statistics": "/data_nfs/je30bery/melanoma_data/data/dataset_statistics/",
+    "downloaded_model_weights": "/data_nfs/je30bery/melanoma_data/data/downloaded_weights/tenpercent_resnet18.ckpt",
+    "pretrained_model_path": "/data_nfs/je30bery/melanoma_data/data/pretrained_models/pre-trained_15_epochs.pt",
+    "cell_types": "/data_nfs/je30bery/melanoma_data/data/cell_types/",
+    "PFS_ROIs": "/data_nfs/je30bery/melanoma_data/data/ROIs/PFS_prediction", 
+    "finetuned_models": "/data_nfs/je30bery/melanoma_data/data/final_finetuned_models/",
+    "hpa_data": "/data_nfs/je30bery/melanoma_data/data/hpa_data/"
+}
