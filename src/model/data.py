@@ -132,7 +132,7 @@ class MelanomaData(Dataset):
         Returns:
             tuple: A tuple containing the tensor image data and its label in train and val mode. 
         """
-        sample = os.path.join(self._config["melanoma_data"], self._data.iloc[index]["Sample"]) #TODO
+        sample = os.path.join(self._config["melanoma_data"], self._data.iloc[index]["MELC image"])
 
         if self._pretrain:
             label = float("Melanoma" in self._data.iloc[index]["Group"])
