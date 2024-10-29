@@ -1,4 +1,4 @@
-## High-accuracy prediction of 5-year progression-free survival of melanoma patients using spatial proteomics and explainable few-shot learning
+## High-accuracy prediction of 5-year progression-free melanoma survival using spatial proteomics and few-shot learning on primary tissue
 1) We provide the following data to reproduce the results from different starting points. To repeat the analyses and create the plots from our paper, you can: 
 - clone this github repository
 - download the image data, the metadata, the anndata file, and the model weights from zenodo
